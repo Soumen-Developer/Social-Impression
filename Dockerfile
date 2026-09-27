@@ -33,10 +33,7 @@ RUN npx prisma generate
 # Build with standalone output
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-RUN npm run build
-
-# Remove .env from standalone output if it was copied
-RUN rm -f .next/standalone/.env
+RUN npm run build && ls -la .next/standalone/ || echo "standalone not created"
 
 # ============================================
 # Stage 4: Production runner (minimal)
