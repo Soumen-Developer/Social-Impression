@@ -1,11 +1,16 @@
+
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
-// Lazy PrismaClient initialization to handle build-time (no DATABASE_URL)
+// Lazy PrismaClient creation to avoid build-time validation errors
+// DATABASE_URL is not available during Next.js build (static generation)
 let prisma: PrismaClient | null = null;
 
 function getPrismaClient(): PrismaClient {
   if (!prisma) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not configured");
+    }
     prisma = new PrismaClient({
       datasources: {
         db: {
@@ -18,10 +23,15 @@ function getPrismaClient(): PrismaClient {
 }
 
 export async function GET() {
+  let client: PrismaClient | null = null;
+  
   try {
     // Test database connection
-    const client = getPrismaClient();
+    client = getPrismaClient();
     await client.$queryRaw`SELECT 1`;
+    
+    await client.$disconnect();
+    client = null;
 
     return NextResponse.json(
       {
@@ -34,6 +44,9 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error) {
+    if (client) {
+      await client.$disconnect().catch(() => {});
+    }
     console.error("Health check failed:", error);
     return NextResponse.json(
       {

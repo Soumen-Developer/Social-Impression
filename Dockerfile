@@ -45,21 +45,26 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+# Prisma query engine path for standalone builds - must be set before Next.js server starts
+ENV PRISMA_QUERY_ENGINE_PATH="/app/node_modules/.prisma/client/libquery_engine-linux-musl-arm64-openssl-3.0.x.so.node"
+ENV PRISMA_ENGINES_PATH="/app/node_modules/.prisma/client/"
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 
-# Copy only production artifacts
+# Copy only production artifacts from builder's standalone output
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# Copy generated Prisma Client from builder to standalone node_modules
-# This ensures Prisma Client is available in the standalone output
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./.next/standalone/node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./.next/standalone/node_modules/@prisma
+# Copy generated Prisma Client from builder to the correct location (standalone node_modules)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
+# Inject Prisma env vars into server.js BEFORE Next.js starts
+# (Removed sed hack as ENV directives already handle this cleanly)
 
 USER nextjs
 
