@@ -1,0 +1,417 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("ARTIST")
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions       Session[]
+  resetTokens    PasswordResetToken[]
+  artistProfile  ArtistProfile?
+  projects       Project[]
+  purchases      Purchase[]
+  membership     Membership?
+  payments       Payment[]
+  paymentIntents PaymentIntent[]
+  files          StoredFile[]
+  notifications  Notification[]
+  tickets        SupportTicket[]
+  ticketMessages TicketMessage[]
+  application    ArtistApplication?
+  calls          ScheduledCall[]
+  auditLogs      AuditLog[]
+  revisions      Revision[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model ArtistProfile {
+  id               String  @id @default(cuid())
+  userId           String  @unique
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug             String  @unique
+  artistName       String
+  moniker          String
+  genre            String  @default("")
+  city             String  @default("")
+  bio              String  @default("")
+  profileImage     String  @default("")
+  coverImage       String  @default("")
+  monthlyListeners String  @default("0")
+  socialLinks      String  @default("[]")
+  songs            String  @default("[]")
+  videos           String  @default("[]")
+  portfolioPublic  Boolean @default(true)
+  showUnreleased   Boolean @default(false)
+  notifyPrefs      String  @default("{\"email\":true,\"push\":true,\"marketing\":false,\"weekly\":true}")
+}
+
+model Package {
+  id                   String  @id @default(cuid())
+  slug                 String  @unique
+  index                String
+  name                 String
+  tagline              String
+  forWhom              String  @default("")
+  duration             String
+  price                Int
+  launchPrice          Int
+  instalmentCount      Int
+  instalmentAmount     Int
+  accent               String  @default("bone")
+  image                String
+  outcome              String
+  includesProduction   String  @default("[]")
+  includesMarketing    String  @default("[]")
+  includesDistribution String  @default("[]")
+  includesFreebies     String  @default("[]")
+  active               Boolean @default(true)
+  sortOrder            Int     @default(0)
+
+  purchases Purchase[]
+  projects  Project[]
+}
+
+model Addon {
+  id     String  @id @default(cuid())
+  name   String
+  price  String
+  note   String
+  active Boolean @default(true)
+}
+
+model Service {
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  name      String
+  tag       String
+  image     String
+  what      String
+  why       String
+  receive   String  @default("[]")
+  journey   String
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+}
+
+model Purchase {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packageId   String
+  package     Package  @relation(fields: [packageId], references: [id])
+  status      String   @default("ACTIVE")
+  launchUsed  Boolean  @default(true)
+  purchasedAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier      String   @default("Momentum")
+  status    String   @default("ACTIVE")
+  startedAt DateTime @default(now())
+  storageGb Int      @default(50)
+}
+
+model Project {
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  artistId           String
+  artist             User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  packageId          String
+  package            Package  @relation(fields: [packageId], references: [id])
+  name               String
+  pkgLabel           String   @default("")
+  status             String   @default("Queued")
+  stage              String   @default("")
+  progress           Int      @default(0)
+  coverImage         String   @default("")
+  streams            Int?
+  purchasedAt        DateTime @default(now())
+  dueDate            String   @default("")
+  ownerTeam          String   @default("")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  milestones   Milestone[]
+  inputs       InputRequest[]
+  deliverables Deliverable[]
+  files        StoredFile[]
+  payments     Payment[]
+
+  @@index([artistId])
+}
+
+model Milestone {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  group     String
+  label     String
+  dateText  String
+  state     String  @default("next")
+  sortOrder Int     @default(0)
+
+  @@index([projectId])
+}
+
+model InputRequest {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  group       String
+  label       String
+  state       String    @default("pending")
+  dueNote     String    @default("")
+  payload     String    @default("")
+  submittedAt DateTime?
+
+  @@index([projectId])
+}
+
+model Deliverable {
+  id            String @id @default(cuid())
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  group         String
+  label         String
+  kind          String  @default("PDF")
+  dateText      String
+  fileId        String?
+  revisionCount Int     @default(0)
+  maxRevisions  Int     @default(2)
+  status        String  @default("DELIVERED")
+
+  revisions Revision[]
+
+  @@index([projectId])
+}
+
+model Revision {
+  id            String      @id @default(cuid())
+  deliverableId String
+  deliverable   Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  requestedById String
+  requestedBy   User        @relation(fields: [requestedById], references: [id])
+  feedback      String
+  status        String      @default("OPEN")
+  createdAt     DateTime    @default(now())
+  resolvedAt    DateTime?
+}
+
+model Payment {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id])
+  invoiceNo String    @unique
+  amount    Int
+  label     String
+  status    String    @default("PENDING")
+  dueDate   DateTime?
+  paidAt    DateTime?
+  method    String    @default("")
+  txnId     String    @default("")
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model PaymentIntent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Int
+  purpose   String
+  refId     String   @default("")
+  status    String   @default("CREATED")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model StoredFile {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  name        String
+  folder      String   @default("Docs")
+  mime        String
+  size        Int
+  storagePath String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  kind      String   @default("info")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  email     String   @default("")
+  subject   String
+  category  String   @default("GENERAL")
+  status    String   @default("Open")
+  priority  String   @default("Medium")
+  urgent    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages TicketMessage[]
+
+  @@index([userId])
+}
+
+model TicketMessage {
+  id        String        @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?         @relation(fields: [authorId], references: [id])
+  body      String
+  isAdmin   Boolean       @default(false)
+  createdAt DateTime      @default(now())
+
+  @@index([ticketId])
+}
+
+model ArtistApplication {
+  id             String   @id @default(cuid())
+  name           String
+  email          String
+  artistName     String   @default("")
+  moniker        String   @default("")
+  genre          String   @default("")
+  city           String   @default("")
+  desiredPackage String   @default("Momentum")
+  links          String   @default("")
+  message        String   @default("")
+  score          Int      @default(0)
+  status         String   @default("New")
+  adminNotes     String   @default("")
+  userId         String?  @unique
+  user           User?    @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+}
+
+model ScheduledCall {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  scheduledAt DateTime
+  mode        String   @default("Google Meet")
+  status      String   @default("SCHEDULED")
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String   @default("")
+  entityId  String   @default("")
+  meta      String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+}
+
+model BlogPost {
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  title     String
+  dek       String
+  category  String
+  date      String
+  readTime  String
+  author    String
+  role      String
+  image     String
+  body      String  @default("[]")
+  featured  Boolean @default(false)
+  published Boolean @default(true)
+}
+
+model Faq {
+  id        String @id @default(cuid())
+  scope     String
+  q         String
+  a         String
+  sortOrder Int    @default(0)
+
+  @@index([scope])
+}
+
+model ContactEnquiry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  intent    String   @default("general")
+  subject   String   @default("")
+  message   String
+  handled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}
